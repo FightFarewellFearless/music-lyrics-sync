@@ -43,11 +43,11 @@ doneButton.addEventListener("click", handleDone);
 
 function handleDone() {
   if (!audioElement.src) {
-    alert("Pilih file terlebih dahulu!");
+    alert("Please select an audio file first!");
     return;
   }
   if (lyricsDisplay.children.length === 1) {
-    alert("Silakan masukkan lirik terlebih dahulu.");
+    alert("Please enter the lyrics.");
     return;
   }
   const lyricLines = document.querySelectorAll(".lyric-line-container");
