@@ -1,85 +1,328 @@
-const audioFileInput = document.getElementById("audioFile");
-const audioElement = document.getElementById("audioPlayer");
-const lyricsInput = document.getElementById("lyricsInput");
-const lyricsDisplay = document.getElementById("lyricsDisplay");
-const doneButton = document.getElementById("doneButton");
+// DOM Elements
+const audioInput = document.getElementById('audioFile');
+const lyricsInput = document.getElementById('lyricsInput');
+const player = document.getElementById('audioPlayer');
+const lyricsContainer = document.getElementById('lyricsDisplay');
+const dropArea = document.getElementById('dropArea');
+const fileNameDisplay = document.getElementById('fileName');
+const playPauseBtn = document.getElementById('playPauseBtn');
+const progressBar = document.getElementById('progressBar');
+const currentTimeDisplay = document.getElementById('currentTime');
+const speedControl = document.getElementById('speedControl');
+const syncLineBtn = document.getElementById('syncLineBtn');
 
-audioFileInput.addEventListener("change", handleAudioUpload);
+// Preview Elements
+const previewBtn = document.getElementById('previewBtn');
+const previewOverlay = document.getElementById('previewOverlay');
+const previewLinesContainer = document.getElementById('previewLines');
+const closePreviewBtn = document.getElementById('closePreviewBtn');
 
-function handleAudioUpload(event) {
-  const file = event.target.files[0];
-  if (file) {
-    const audioURL = URL.createObjectURL(file);
-    const audioElement = document.getElementById("audioPlayer");
-    audioElement.src = audioURL;
-  }
-}
+// Views
+const setupView = document.getElementById('setupView');
+const syncView = document.getElementById('syncView');
 
-lyricsInput.addEventListener("change", handleLyricsInput);
+// State
+let lyricLines = []; 
+let activeIndex = 0;
+let isPreviewMode = false;
 
-function handleLyricsInput(event) {
-  const lyrics = event.target.value;
-  lyricsDisplay.innerHTML = null;
-  const lyricsArray = lyrics.split("\n");
-  lyricsArray.forEach((element) => {
-    const div = document.createElement("div");
-    const p = document.createElement("p");
-    const timeP = document.createElement("p");
-    timeP.className = "lyric-time";
-    div.onclick = () => {
-      div.scrollIntoView({ behavior: "smooth", block: "center" });
-      timeP.textContent = audioElement.currentTime.toFixed(2);
-    };
-    div.className = "lyric-line-container";
-    p.className = "lyric-line";
-    p.textContent = element;
-    div.appendChild(p);
-    div.appendChild(timeP);
-    lyricsDisplay.appendChild(div);
-  });
-}
+// --- Initialization & Event Listeners ---
 
-doneButton.addEventListener("click", handleDone);
-
-function handleDone() {
-  if (!audioElement.src) {
-    alert("Please select an audio file first!");
-    return;
-  }
-  if (lyricsDisplay.children.length === 1) {
-    alert("Please enter the lyrics.");
-    return;
-  }
-  const lyricLines = document.querySelectorAll(".lyric-line-container");
-  let lrcContent = "";
-  lyricLines.forEach((line) => {
-    const time = line.querySelector(".lyric-time").textContent;
-    const text = line.querySelector(".lyric-line").textContent;
-    if (time) {
-      const minutes = String(Math.floor(time / 60)).padStart(2, "0");
-      const seconds = String((time % 60).toFixed(2)).padStart(5, "0");
-      lrcContent += `[${minutes}:${seconds}] ${text}\n`;
+// File Upload Handling
+audioInput.addEventListener('change', handleFileSelect);
+dropArea.addEventListener('dragover', (e) => { e.preventDefault(); dropArea.style.borderColor = '#6c5ce7'; });
+dropArea.addEventListener('dragleave', () => { dropArea.style.borderColor = '#444'; });
+dropArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropArea.style.borderColor = '#444';
+    if (e.dataTransfer.files.length) {
+        audioInput.files = e.dataTransfer.files;
+        handleFileSelect({ target: audioInput });
     }
-  });
-  downloadLRC(lrcContent);
+});
+
+function handleFileSelect(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const url = URL.createObjectURL(file);
+        player.src = url;
+        fileNameDisplay.textContent = file.name;
+    }
 }
 
-function downloadLRC(content) {
-  const blob = new Blob([content], { type: "text/plain" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download =  audioFileInput.files[0].name.replace(/\.[^/.]+$/, "") + ".lrc";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+// Navigation
+document.getElementById('startBtn').addEventListener('click', () => {
+    if (!player.src) return alert("Please upload an audio file first.");
+    const rawText = lyricsInput.value.trim();
+    if (!rawText) return alert("Please paste some lyrics.");
+    
+    // Parse lyrics
+    lyricLines = rawText.split('\n').map(line => ({
+        text: line.trim(),
+        time: null
+    })).filter(l => l.text !== ""); 
+
+    renderLyrics();
+    switchView('sync');
+    activeIndex = 0;
+    updateActiveLine();
+});
+
+document.getElementById('editBtn').addEventListener('click', () => {
+    switchView('setup');
+    player.pause();
+});
+
+function switchView(viewName) {
+    if (viewName === 'sync') {
+        setupView.classList.remove('active');
+        setupView.classList.add('hidden');
+        syncView.classList.remove('hidden');
+        syncView.classList.add('active');
+    } else {
+        syncView.classList.remove('active');
+        syncView.classList.add('hidden');
+        setupView.classList.remove('hidden');
+        setupView.classList.add('active');
+    }
 }
 
-function skipForward(time) {
-  audioElement.currentTime += time;
+// --- Player Controls ---
+
+playPauseBtn.addEventListener('click', togglePlay);
+speedControl.addEventListener('change', (e) => player.playbackRate = parseFloat(e.target.value));
+
+player.addEventListener('timeupdate', () => {
+    const current = player.currentTime;
+    progressBar.value = current;
+    currentTimeDisplay.textContent = formatTimeSimple(current);
+    
+    // Trigger Preview Update if mode is active
+    if (isPreviewMode) {
+        updatePreviewHighlight(current);
+    }
+});
+
+player.addEventListener('loadedmetadata', () => {
+    progressBar.max = player.duration;
+});
+
+progressBar.addEventListener('input', () => {
+    player.currentTime = progressBar.value;
+});
+
+function togglePlay() {
+    if (player.paused) {
+        player.play();
+        playPauseBtn.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
+    } else {
+        player.pause();
+        playPauseBtn.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
+    }
 }
 
-function skipBackward(time) {
-  audioElement.currentTime -= time;
+window.skip = function(seconds) {
+    player.currentTime += seconds;
 }
+
+// --- Sync Logic ---
+
+function renderLyrics() {
+    lyricsContainer.innerHTML = '';
+    lyricLines.forEach((line, index) => {
+        const div = document.createElement('div');
+        div.className = `lyric-row ${index === 0 ? 'active' : ''}`;
+        div.dataset.index = index;
+        div.innerHTML = `
+            <span class="lyric-text">${line.text}</span>
+            <span class="timestamp" onclick="adjustTimestamp(${index})">
+                ${line.time !== null ? formatTimeLRC(line.time) : '--:--.--'}
+            </span>
+        `;
+        div.addEventListener('click', (e) => {
+            if(!e.target.classList.contains('timestamp')) {
+                activeIndex = index;
+                updateActiveLine();
+            }
+        });
+        lyricsContainer.appendChild(div);
+    });
+}
+
+function syncCurrentLine() {
+    if (activeIndex < lyricLines.length) {
+        lyricLines[activeIndex].time = player.currentTime;
+        updateRowUI(activeIndex);
+        if (activeIndex < lyricLines.length - 1) {
+            activeIndex++;
+            updateActiveLine();
+        }
+        scrollToActive();
+    }
+}
+
+function updateRowUI(index) {
+    const row = lyricsContainer.children[index];
+    const timeSpan = row.querySelector('.timestamp');
+    timeSpan.textContent = formatTimeLRC(lyricLines[index].time);
+    row.classList.add('synced');
+}
+
+function updateActiveLine() {
+    Array.from(lyricsContainer.children).forEach(c => c.classList.remove('active'));
+    const currentRow = lyricsContainer.children[activeIndex];
+    if(currentRow) currentRow.classList.add('active');
+    scrollToActive();
+}
+
+function scrollToActive() {
+    const currentRow = lyricsContainer.children[activeIndex];
+    if (currentRow) {
+        currentRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+
+window.adjustTimestamp = function(index) {
+    if (confirm(`Clear timestamp for: "${lyricLines[index].text}"?`)) {
+        lyricLines[index].time = null;
+        const row = lyricsContainer.children[index];
+        row.querySelector('.timestamp').textContent = '--:--.--';
+        row.classList.remove('synced');
+    }
+};
+
+// --- PREVIEW / KARAOKE LOGIC ---
+
+previewBtn.addEventListener('click', () => {
+    const hasSyncedLines = lyricLines.some(l => l.time !== null);
+    if (!hasSyncedLines) return alert("You haven't synced any lines yet!");
+
+    // Hide Editor, Show Overlay
+    document.getElementById('lyricsDisplay').classList.add('hidden');
+    previewOverlay.classList.remove('hidden');
+    isPreviewMode = true;
+
+    // Render Preview Lyrics
+    previewLinesContainer.innerHTML = '';
+    lyricLines.forEach((line, index) => {
+        const p = document.createElement('div');
+        p.className = 'p-line';
+        p.textContent = line.text;
+        p.id = `preview-line-${index}`;
+        previewLinesContainer.appendChild(p);
+    });
+
+    if (player.paused) togglePlay();
+});
+
+closePreviewBtn.addEventListener('click', () => {
+    previewOverlay.classList.add('hidden');
+    document.getElementById('lyricsDisplay').classList.remove('hidden');
+    isPreviewMode = false;
+});
+
+function updatePreviewHighlight(currentTime) {
+    let activeIdx = -1;
+    for (let i = 0; i < lyricLines.length; i++) {
+        if (lyricLines[i].time !== null && lyricLines[i].time <= currentTime) {
+            activeIdx = i;
+        } else if (lyricLines[i].time !== null && lyricLines[i].time > currentTime) {
+            break;
+        }
+    }
+    
+    const allLines = document.querySelectorAll('.p-line');
+    allLines.forEach(l => l.classList.remove('active'));
+
+    if (activeIdx !== -1) {
+        const activeEl = document.getElementById(`preview-line-${activeIdx}`);
+        if (activeEl) {
+            activeEl.classList.add('active');
+            activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+}
+
+// --- Inputs ---
+
+syncLineBtn.addEventListener('click', syncCurrentLine);
+
+document.addEventListener('keydown', (e) => {
+    if (syncView.classList.contains('hidden') || isPreviewMode) return;
+
+    switch(e.code) {
+        case 'Space':
+            e.preventDefault();
+            togglePlay();
+            break;
+        case 'Enter': 
+        case 'NumpadEnter':
+            e.preventDefault();
+            syncCurrentLine();
+            break;
+        case 'ArrowDown':
+            e.preventDefault();
+            if (activeIndex < lyricLines.length - 1) {
+                activeIndex++;
+                updateActiveLine();
+            }
+            break;
+        case 'ArrowUp':
+            e.preventDefault();
+            if (activeIndex > 0) {
+                activeIndex--;
+                updateActiveLine();
+            }
+            break;
+        case 'ArrowLeft':
+            skip(-5);
+            break;
+        case 'ArrowRight':
+            skip(5);
+            break;
+        case 'Backspace':
+             // Optional: undo logic could go here
+             break;
+    }
+});
+
+// --- Export ---
+
+document.getElementById('downloadBtn').addEventListener('click', () => {
+    let content = "";
+    lyricLines.forEach(line => {
+        if (line.time !== null) {
+            content += `[${formatTimeLRC(line.time)}]${line.text}\n`;
+        }
+    });
+    
+    if (content === "") return alert("No lines have been synced yet!");
+
+    const blob = new Blob([content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = (audioInput.files[0]?.name.replace(/\.[^/.]+$/, "") || "lyrics") + ".lrc";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+});
+
+// --- Helpers ---
+
+function formatTimeSimple(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+
+function formatTimeLRC(time) {
+    const m = Math.floor(time / 60);
+    const s = (time % 60).toFixed(2);
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(5, '0')}`;
+}
+
+// Help Modal
+const modal = document.getElementById('helpModal');
+document.getElementById('helpBtn').addEventListener('click', () => modal.classList.remove('hidden'));
+document.getElementById('closeHelp').addEventListener('click', () => modal.classList.add('hidden'));

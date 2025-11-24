@@ -2,28 +2,101 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Music Lyrics Synchronizer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Modern LRC Maker</title>
     <link rel="stylesheet" href="styles.css">
     <script src="script.js" defer></script>
 </head>
 <body>
-    <div class="container">
-        <h1>Music Lyrics Synchronizer</h1>
-        <div class="input-section">
-            <input type="file" id="audioFile" accept="audio/*">
-            <textarea id="lyricsInput" placeholder="Paste your lyrics here..."></textarea>
-        </div>
-        <div class="player">
-            <audio id="audioPlayer" controls></audio>
-            <div class="controls">
-                <button id="backwardButton" onclick="skipBackward(5)"> << 5s</button>
-                <button id="forwardButton" onclick="skipForward(5)"> 5s >></button>
+
+    <header>
+        <div class="logo">Lyric<span>.sync</span></div>
+        <button id="helpBtn" class="btn-icon" title="Shortcuts">?</button>
+    </header>
+
+    <main class="container">
+        
+        <section id="setupView" class="view active">
+            <div class="card">
+                <h2>1. Upload Audio</h2>
+                <div class="file-drop-area" id="dropArea">
+                    <p>Drag & drop or click to upload audio</p>
+                    <input type="file" id="audioFile" accept="audio/*">
+                    <span id="fileName">No file selected</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>2. Paste Lyrics</h2>
+                <textarea id="lyricsInput" placeholder="Paste your lyrics here (one line per row)..."></textarea>
+            </div>
+
+            <button id="startBtn" class="btn-primary full-width">Start Synchronizing &rarr;</button>
+        </section>
+
+        <section id="syncView" class="view hidden">
+            <div class="toolbar">
+                <div class="toolbar-left">
+                    <button id="editBtn" class="btn-secondary">&larr; Back</button>
+                </div>
+                <div class="toolbar-right">
+                    <button id="previewBtn" class="btn-preview">&#9658; Test Sync</button>
+                    <button id="downloadBtn" class="btn-success">Download .lrc</button>
+                </div>
+            </div>
+            
+            <div id="lyricsDisplay" class="lyrics-scroll-area"></div>
+
+            <div id="previewOverlay" class="preview-container hidden">
+                <div id="previewLines" class="karaoke-box"></div>
+                <button id="closePreviewBtn" class="btn-float-close">Stop Testing</button>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="player-bar">
+        <input type="range" id="progressBar" value="0" step="0.1">
+        
+        <div class="controls-grid">
+            <div class="meta-controls">
+                <select id="speedControl">
+                    <option value="0.5">0.5x</option>
+                    <option value="0.75">0.75x</option>
+                    <option value="1" selected>1.0x</option>
+                    <option value="1.25">1.25x</option>
+                </select>
+                <span id="currentTime">00:00</span>
+            </div>
+
+            <div class="main-controls">
+                <button class="btn-control" onclick="skip(-5)">&#8634; 5s</button>
+                <button id="playPauseBtn" class="btn-play-large">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                </button>
+                <button class="btn-control" onclick="skip(5)">5s &#8635;</button>
+            </div>
+
+            <div class="action-controls">
+                <button id="syncLineBtn" class="btn-sync">SYNC LINE</button>
             </div>
         </div>
-        <div class="lyrics-display" id="lyricsDisplay">
-            <p>Please upload an audio file and lyrics to get started</p>
+        <audio id="audioPlayer"></audio>
+    </footer>
+
+    <div id="helpModal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Keyboard Shortcuts</h3>
+            <ul>
+                <li><b>Space</b> : Play / Pause</li>
+                <li><b>Enter</b> : Sync current line & go next</li>
+                <li><b>Arrow Up/Down</b> : Move selection</li>
+                <li><b>Arrow Left/Right</b> : Seek +/- 5s</li>
+                <li><b>Backspace</b> : Clear timestamp</li>
+            </ul>
+            <button id="closeHelp" class="btn-secondary">Close</button>
         </div>
-        <button id="doneButton">Download .lrc file</button>
+    </div>
+
 </body>
 </html>
