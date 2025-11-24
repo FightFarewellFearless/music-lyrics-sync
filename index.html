@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Lyrics Synchronizer</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="script.js" defer></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Music Lyrics Synchronizer</h1>
+        <div class="input-section">
+            <input type="file" id="audioFile" accept="audio/*">
+            <textarea id="lyricsInput" placeholder="Paste your lyrics here..."></textarea>
+        </div>
+        <div class="player">
+            <audio id="audioPlayer" controls></audio>
+            <div class="controls">
+                <button id="backwardButton" onclick="skipBackward(5)"> << 5s</button>
+                <button id="forwardButton" onclick="skipForward(5)"> 5s >></button>
+            </div>
+        </div>
+        <div class="lyrics-display" id="lyricsDisplay">
+            <p>Masukkan file audio dan lirik terlebih dahulu untuk memulai</p>
+        </div>
+        <button id="doneButton">Download file .lrc</button>
+</body>
+</html>
