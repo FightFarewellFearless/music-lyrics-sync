@@ -9,6 +9,7 @@
     --text-muted: #a0a0a0;
     --highlight: #2d2d44;
     --border: #333;
+    --danger: #ff5252;
 }
 
 * { box-sizing: border-box; outline: none; }
@@ -45,8 +46,6 @@ header {
     padding: 20px;
     width: 100%;
     overflow-y: auto;
-    
-    /* FIX: Add massive padding at bottom so content isn't hidden behind player */
     padding-bottom: 250px; 
 }
 
@@ -112,7 +111,7 @@ button { cursor: pointer; border: none; font-weight: 600; transition: 0.2s; }
     background: var(--bg-color); 
     padding: 10px 0;
 }
-.toolbar-right { display: flex; gap: 10px; }
+.toolbar-left, .toolbar-right { display: flex; gap: 10px; }
 
 .lyrics-scroll-area { display: flex; flex-direction: column; gap: 8px; }
 
@@ -133,8 +132,27 @@ button { cursor: pointer; border: none; font-weight: 600; transition: 0.2s; }
 }
 .lyric-row.synced .timestamp { color: var(--accent); font-weight: bold; }
 
-.lyric-text { font-size: 1.1rem; line-height: 1.4; }
-.timestamp { font-family: monospace; color: #555; font-size: 0.9rem; min-width: 70px; text-align: right; }
+.lyric-text { font-size: 1.1rem; line-height: 1.4; flex: 1; }
+
+/* Right side of a row: Timestamp + Delete Btn */
+.row-right { display: flex; align-items: center; gap: 10px; }
+
+.timestamp { 
+    font-family: monospace; color: #555; font-size: 0.9rem; 
+    min-width: 70px; text-align: right; cursor: pointer;
+}
+
+/* Delete Button */
+.btn-delete {
+    background: transparent;
+    color: #444;
+    font-size: 1.2rem;
+    padding: 0 5px;
+    opacity: 0; /* Hidden by default */
+    transition: 0.2s;
+}
+.lyric-row:hover .btn-delete { opacity: 1; } /* Show on hover */
+.btn-delete:hover { color: var(--danger); }
 
 /* Sticky Player */
 .player-bar {
@@ -166,18 +184,31 @@ button { cursor: pointer; border: none; font-weight: 600; transition: 0.2s; }
 
 .meta-controls { display: flex; gap: 10px; align-items: center; color: var(--text-muted); font-size: 0.9rem; }
 .main-controls { display: flex; gap: 15px; align-items: center; }
-.action-controls { display: flex; justify-content: flex-end; }
+
+/* Action Controls (Bottom Right) */
+.action-controls { display: flex; justify-content: flex-end; gap: 10px; }
 
 .btn-control { background: #333; color: white; padding: 8px 12px; border-radius: 50px; font-size: 0.8rem; }
 .btn-play-large { 
     background: white; color: black; width: 50px; height: 50px; border-radius: 50%; 
     display: flex; align-items: center; justify-content: center; 
 }
+
+/* Sync & Break Buttons */
 .btn-sync {
     background: var(--accent); color: white; padding: 12px 20px; border-radius: 8px;
     box-shadow: 0 4px 15px rgba(108, 92, 231, 0.4);
 }
 .btn-sync:active { transform: scale(0.95); }
+
+.btn-break {
+    background: #333; color: var(--text-muted); 
+    padding: 12px 15px; border-radius: 8px; 
+    border: 1px solid #444;
+}
+.btn-break:hover { background: #444; color: white; }
+.btn-break:active { transform: scale(0.95); }
+
 
 /* PREVIEW / KARAOKE MODE */
 .preview-container {
@@ -238,8 +269,9 @@ button { cursor: pointer; border: none; font-weight: 600; transition: 0.2s; }
 /* Mobile Tweaks */
 @media (max-width: 600px) {
     .controls-grid { grid-template-columns: 1fr; gap: 15px; justify-items: center; }
-    .action-controls { width: 100%; }
-    .btn-sync { width: 100%; font-size: 1.1rem; }
+    .action-controls { width: 100%; justify-content: space-between; }
+    .btn-sync { flex: 2; font-size: 1.1rem; }
+    .btn-break { flex: 1; }
     .meta-controls { width: 100%; justify-content: space-between; }
     .lyric-text { font-size: 1rem; }
     .toolbar-right { gap: 5px; }

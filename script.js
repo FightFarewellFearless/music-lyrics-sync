@@ -10,6 +10,7 @@ const progressBar = document.getElementById('progressBar');
 const currentTimeDisplay = document.getElementById('currentTime');
 const speedControl = document.getElementById('speedControl');
 const syncLineBtn = document.getElementById('syncLineBtn');
+const insertBreakBtn = document.getElementById('insertBreakBtn'); // MOVED TO FOOTER
 
 // Preview Elements
 const previewBtn = document.getElementById('previewBtn');
@@ -50,7 +51,7 @@ function handleFileSelect(e) {
     }
 }
 
-// Navigation
+// Navigation & View Switching
 document.getElementById('startBtn').addEventListener('click', () => {
     if (!player.src) return alert("Please upload an audio file first.");
     const rawText = lyricsInput.value.trim();
@@ -68,9 +69,40 @@ document.getElementById('startBtn').addEventListener('click', () => {
     updateActiveLine();
 });
 
+// Back Button with Warning
 document.getElementById('editBtn').addEventListener('click', () => {
+    const hasProgress = lyricLines.some(line => line.time !== null);
+    
+    if (hasProgress) {
+        const confirmLeave = confirm("⚠️ Warning: Going back will discard your current synchronization progress.\n\nAre you sure you want to continue?");
+        if (!confirmLeave) return;
+    }
+
     switchView('setup');
     player.pause();
+    
+    // Reset Data
+    lyricLines = [];
+    lyricsContainer.innerHTML = '';
+});
+
+// NEW: Insert Break Logic (Auto-Syncs Current Time)
+insertBreakBtn.addEventListener('click', () => {
+    const currentTime = player.currentTime;
+    
+    const newLine = {
+        text: "", // Visual indicator
+        time: currentTime // Auto-set timestamp
+    };
+    
+    // Insert at current active position
+    lyricLines.splice(activeIndex, 0, newLine);
+    
+    // Advance index so we are ready for the NEXT line immediately
+    activeIndex++;
+
+    renderLyrics();
+    updateActiveLine();
 });
 
 function switchView(viewName) {
@@ -97,7 +129,6 @@ player.addEventListener('timeupdate', () => {
     progressBar.value = current;
     currentTimeDisplay.textContent = formatTimeSimple(current);
     
-    // Trigger Preview Update if mode is active
     if (isPreviewMode) {
         updatePreviewHighlight(current);
     }
@@ -131,22 +162,43 @@ function renderLyrics() {
     lyricsContainer.innerHTML = '';
     lyricLines.forEach((line, index) => {
         const div = document.createElement('div');
-        div.className = `lyric-row ${index === 0 ? 'active' : ''}`;
+        div.className = `lyric-row ${index === activeIndex ? 'active' : ''}`;
         div.dataset.index = index;
+        
+        if(line.time !== null) div.classList.add('synced');
+
+        // Added Delete Button (x)
         div.innerHTML = `
             <span class="lyric-text">${line.text}</span>
-            <span class="timestamp" onclick="adjustTimestamp(${index})">
-                ${line.time !== null ? formatTimeLRC(line.time) : '--:--.--'}
-            </span>
+            <div class="row-right">
+                <span class="timestamp" onclick="adjustTimestamp(${index})">
+                    ${line.time !== null ? formatTimeLRC(line.time) : '--:--.--'}
+                </span>
+                <button class="btn-delete" onclick="deleteLine(event, ${index})" title="Delete Line">&times;</button>
+            </div>
         `;
+        
         div.addEventListener('click', (e) => {
-            if(!e.target.classList.contains('timestamp')) {
+            // Prevent changing active line if clicking timestamp or delete
+            if(!e.target.closest('.row-right')) {
                 activeIndex = index;
                 updateActiveLine();
             }
         });
         lyricsContainer.appendChild(div);
     });
+}
+
+// NEW: Delete Line Function
+window.deleteLine = function(event, index) {
+    event.stopPropagation(); // Stop row click event
+    if(confirm('Delete this line?')) {
+        lyricLines.splice(index, 1);
+        // Adjust active index if necessary
+        if (index < activeIndex) activeIndex--;
+        renderLyrics();
+        updateActiveLine();
+    }
 }
 
 function syncCurrentLine() {
@@ -163,6 +215,7 @@ function syncCurrentLine() {
 
 function updateRowUI(index) {
     const row = lyricsContainer.children[index];
+    if (!row) return;
     const timeSpan = row.querySelector('.timestamp');
     timeSpan.textContent = formatTimeLRC(lyricLines[index].time);
     row.classList.add('synced');
@@ -197,17 +250,15 @@ previewBtn.addEventListener('click', () => {
     const hasSyncedLines = lyricLines.some(l => l.time !== null);
     if (!hasSyncedLines) return alert("You haven't synced any lines yet!");
 
-    // Hide Editor, Show Overlay
     document.getElementById('lyricsDisplay').classList.add('hidden');
     previewOverlay.classList.remove('hidden');
     isPreviewMode = true;
 
-    // Render Preview Lyrics
     previewLinesContainer.innerHTML = '';
     lyricLines.forEach((line, index) => {
         const p = document.createElement('div');
         p.className = 'p-line';
-        p.textContent = line.text;
+        p.textContent = line.text === '' ? '● ● ●' : line.text;
         p.id = `preview-line-${index}`;
         previewLinesContainer.appendChild(p);
     });
